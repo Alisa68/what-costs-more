@@ -1,112 +1,25 @@
-const state = {
-  period: 7,
-  data: null,
-  metrics: []
-};
-
-const fmtPct = value => {
-  const sign = value > 0.004 ? "+" : value < -0.004 ? "−" : "";
-  return sign + Math.abs(value).toLocaleString("ru-RU", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
-  }) + "%";
-};
-
-const fmtDate = iso => {
-  const [y,m,d] = iso.split("-");
-  return `${d}.${m}.${y}`;
-};
-
-function cumulativeChange(indices, period) {
-  if (period === 7) return indices.at(-1) - 100;
-  const intervals = indices.slice(-4);
-  const factor = intervals.reduce((acc, idx) => acc * (idx / 100), 1);
-  return (factor - 1) * 100;
-}
-
-function getMetrics(period) {
-  return state.data.items.map(item => ({...item, change: cumulativeChange(item.indices, period)})).sort((a,b) => b.change - a.change);
-}
-
-function maxAbs(metrics) { return Math.max(...metrics.map(d => Math.abs(d.change)), 0.01); }
-function statusText(value) {
-  if (value > 0.15) return "цена выросла";
-  if (value < -0.15) return "цена снизилась";
-  return "почти без изменений";
-}
-
-function buildSummary(metrics, period) {
-  const leader = metrics[0];
-  const decline = [...metrics].sort((a,b) => a.change - b.change)[0];
-  const stable = [...metrics].sort((a,b) => Math.abs(a.change) - Math.abs(b.change))[0];
-  const falling = metrics.filter(d => d.change < -0.15);
-  const periodText = period === 7 ? "за неделю" : "за четыре недели";
-  let text = `${leader.shortName} показал максимальный рост ${periodText}: ${fmtPct(leader.change)}. `;
-  if (decline.change < -0.15) text += `Сильнее всего снизился ${decline.shortName.toLowerCase()}: ${fmtPct(decline.change)}. `;
-  text += `Самая стабильная категория — ${stable.shortName.toLowerCase()} (${fmtPct(stable.change)}).`;
-  if (falling.length >= 3) text += ` В ${falling.length} из 6 категорий за период зафиксировано снижение.`;
-  return {leader, decline, stable, text};
-}
-
-function renderBars(metrics, containerId, share = false) {
-  const max = maxAbs(metrics), el = document.getElementById(containerId); el.innerHTML = "";
-  metrics.forEach(item => {
-    const width = Math.min(Math.abs(item.change) / max * 48, 48), row = document.createElement("div");
-    row.className = share ? "share-bar" : "bar-row";
-    const name = document.createElement("div"); name.className = share ? "share-bar-name" : "bar-name"; name.textContent = item.shortName;
-    const track = document.createElement("div"); track.className = share ? "share-bar-track" : "bar-track";
-    const bar = document.createElement("div"); bar.className = share ? (item.change >= 0 ? "share-bar-pos" : "share-bar-neg") : (item.change >= 0 ? "bar-positive" : "bar-negative"); bar.style.width = `${width}%`; track.appendChild(bar);
-    const val = document.createElement("div"); val.className = share ? "share-bar-value" : "bar-value"; val.textContent = fmtPct(item.change);
-    row.append(name, track, val); el.appendChild(row);
-  });
-}
-
-function renderCards(metrics) {
-  const el = document.getElementById("cards"); el.innerHTML = "";
-  metrics.forEach(item => {
-    const card = document.createElement("article"); card.className = "metric-card";
-    const cls = item.change > 0.15 ? "positive" : item.change < -0.15 ? "negative" : "";
-    card.innerHTML = `<div><div class="metric-top"><span>${item.unit}</span><span>${state.period === 7 ? "7 дней" : "4 недели"}</span></div><h3>${item.name}</h3></div><div><div class="metric-change ${cls}">${fmtPct(item.change)}</div><div class="metric-status">${statusText(item.change)}</div></div>`;
-    el.appendChild(card);
-  });
-}
-
-function render() {
-  const metrics = getMetrics(state.period); state.metrics = metrics;
-  const {leader, decline, stable, text} = buildSummary(metrics, state.period), max = maxAbs(metrics);
-  const ringDeg = Math.max(35, Math.min(Math.abs(leader.change) / max, 1) * 300);
-  document.documentElement.style.setProperty("--ringDeg", `${ringDeg}deg`); document.documentElement.style.setProperty("--shareDeg", `${ringDeg}deg`);
-  document.getElementById("leaderValue").textContent = fmtPct(leader.change); document.getElementById("leaderName").textContent = leader.shortName;
-  document.getElementById("headline").textContent = leader.change > 0.15 ? `${leader.shortName} — лидер роста` : "Рост цен за период минимален";
-  document.getElementById("summary").textContent = text;
-  document.getElementById("declineChip").textContent = decline.change < -0.15 ? `${decline.shortName} ${fmtPct(decline.change)}` : "нет заметного снижения";
-  document.getElementById("stableChip").textContent = `${stable.shortName} ${fmtPct(stable.change)}`;
-  document.getElementById("autoInsight").textContent = text; document.getElementById("updatedDate").textContent = fmtDate(state.data.updated);
-  renderBars(metrics, "bars"); renderCards(metrics);
-  document.getElementById("shareDate").textContent = fmtDate(state.data.updated);
-  document.getElementById("sharePeriod").textContent = `Россия · ${state.period === 7 ? "последние 7 дней" : "последние 4 недели"}`;
-  document.getElementById("shareLeaderValue").textContent = fmtPct(leader.change); document.getElementById("shareLeaderName").textContent = leader.shortName;
-  document.getElementById("shareLeaderText").textContent = `${leader.shortName}: максимальный рост среди шести выбранных категорий.`;
-  document.getElementById("shareStable").textContent = `${stable.shortName} ${fmtPct(stable.change)}`;
-  document.getElementById("shareDecline").textContent = decline.change < -0.15 ? `${decline.shortName} ${fmtPct(decline.change)}` : "нет заметного снижения";
-  renderBars(metrics, "shareBars", true);
-}
-
-async function downloadPng() {
-  const button = document.getElementById("downloadPng"), old = button.textContent; button.textContent = "Готовим PNG…"; button.disabled = true;
-  try {
-    const canvas = await html2canvas(document.getElementById("shareCard"), {scale:1, backgroundColor:"#f4f3ee", useCORS:true, logging:false});
-    const link = document.createElement("a"); link.download = `chto-dorozhaet-${state.period}d-${state.data.updated}.png`; link.href = canvas.toDataURL("image/png"); link.click();
-  } finally { button.textContent = old; button.disabled = false; }
-}
-
-async function init() {
-  try {
-    const response = await fetch("data/prices.json"); if (!response.ok) throw new Error("Не удалось загрузить data/prices.json"); state.data = await response.json();
-    document.querySelectorAll(".period-btn").forEach(btn => btn.addEventListener("click", () => {document.querySelectorAll(".period-btn").forEach(b => b.classList.remove("active")); btn.classList.add("active"); state.period = Number(btn.dataset.period); render();}));
-    document.getElementById("downloadPng").addEventListener("click", downloadPng); render();
-  } catch (error) {
-    console.error(error); document.getElementById("headline").textContent = "Не удалось загрузить данные"; document.getElementById("summary").textContent = "Запускайте проект через локальный сервер или GitHub Pages, а не двойным кликом по index.html.";
-  }
-}
+const state={period:7,data:null,metrics:[]};
+const THRESHOLD=.15;
+const fmtPct=v=>{const sign=v>.004?"+":v<-.004?"−":"";return sign+Math.abs(v).toLocaleString("ru-RU",{minimumFractionDigits:2,maximumFractionDigits:2})+"%"};
+const arrow=v=>v>THRESHOLD?"↑":v<-THRESHOLD?"↓":"→";
+const tone=v=>v>THRESHOLD?"positive":v<-THRESHOLD?"negative":"flat";
+const fmtMetric=v=>`${arrow(v)} ${fmtPct(v)}`;
+const fmtDate=iso=>{const[y,m,d]=iso.split("-");return`${d}.${m}.${y}`};
+function cumulativeChange(indices,period){if(period===7)return indices.at(-1)-100;const intervals=indices.slice(-4);return(intervals.reduce((a,i)=>a*(i/100),1)-1)*100}
+function getMetrics(period){return state.data.items.map(item=>({...item,change:cumulativeChange(item.indices,period)})).sort((a,b)=>b.change-a.change)}
+function maxAbs(metrics){return Math.max(...metrics.map(d=>Math.abs(d.change)),.01)}
+function statusText(v){if(v>THRESHOLD)return"↑ цена выросла";if(v<-THRESHOLD)return"↓ цена снизилась";return"→ почти без изменений"}
+function buildSummary(metrics,period){const highest=metrics[0],decline=[...metrics].sort((a,b)=>a.change-b.change)[0],stable=[...metrics].sort((a,b)=>Math.abs(a.change)-Math.abs(b.change))[0],falling=metrics.filter(d=>d.change<-THRESHOLD),rising=metrics.filter(d=>d.change>THRESHOLD),periodText=period===7?"за неделю":"за четыре недели";let text,mode;
+if(rising.length){mode="up";text=`Сильнее всего ${periodText} подорожал ${highest.shortName.toLowerCase()}: ${fmtPct(highest.change)}. `}else{mode="down";text=`Среди выбранных категорий заметного роста ${periodText} нет. `}
+if(decline.change<-THRESHOLD)text+=`Сильнее всего подешевел ${decline.shortName.toLowerCase()}: ${fmtPct(decline.change)}. `;
+text+=`Самая стабильная категория — ${stable.shortName.toLowerCase()} (${fmtPct(stable.change)}).`;
+if(falling.length>=3)text+=` Снижение зафиксировано в ${falling.length} из 6 категорий.`;
+return{highest,decline,stable,text,mode,rising}}
+function renderBars(metrics,containerId,share=false){const max=maxAbs(metrics),el=document.getElementById(containerId);el.innerHTML="";metrics.forEach(item=>{const width=Math.min(Math.abs(item.change)/max*48,48),row=document.createElement("div");row.className=share?"share-bar":"bar-row";const name=document.createElement("div");name.className=share?"share-bar-name":"bar-name";name.textContent=item.shortName;const track=document.createElement("div");track.className=share?"share-bar-track":"bar-track";const t=tone(item.change),bar=document.createElement("div");bar.className=share?(t==="positive"?"share-bar-pos":t==="negative"?"share-bar-neg":"share-bar-flat"):(t==="positive"?"bar-positive":t==="negative"?"bar-negative":"bar-flat");bar.style.width=t==="flat"?"6px":`${width}%`;track.appendChild(bar);const val=document.createElement("div");val.className=`${share?"share-bar-value":"bar-value"} ${t}`;val.textContent=fmtMetric(item.change);row.append(name,track,val);el.appendChild(row)})}
+function renderCards(metrics){const el=document.getElementById("cards");el.innerHTML="";metrics.forEach(item=>{const card=document.createElement("article");card.className="metric-card";const t=tone(item.change);card.innerHTML=`<div><div class="metric-top"><span>${item.unit}</span><span>${state.period===7?"7 дней":"4 недели"}</span></div><h3>${item.name}</h3></div><div><div class="metric-change ${t}">${fmtMetric(item.change)}</div><div class="metric-status">${statusText(item.change)}</div></div>`;el.appendChild(card)})}
+function render(){const metrics=getMetrics(state.period);state.metrics=metrics;const{highest,decline,stable,text,mode,rising}=buildSummary(metrics,state.period),focus=mode==="up"?highest:decline,max=maxAbs(metrics),ringDeg=Math.max(35,Math.min(Math.abs(focus.change)/max,1)*300),signal=mode==="up"?"#f05a47":"#3977e3";document.documentElement.style.setProperty("--ringDeg",`${ringDeg}deg`);document.documentElement.style.setProperty("--shareDeg",`${ringDeg}deg`);document.documentElement.style.setProperty("--signal",signal);
+document.getElementById("radialLabel").textContent=mode==="up"?"сильнее подорожал":"сильнее подешевел";document.getElementById("leaderValue").textContent=fmtMetric(focus.change);document.getElementById("leaderName").textContent=focus.shortName;document.getElementById("headline").textContent=mode==="up"?`${highest.shortName} подорожал сильнее остальных`:`За период заметного роста нет`;document.getElementById("summary").textContent=text;document.getElementById("declineChip").textContent=decline.change<-THRESHOLD?`${decline.shortName} ${fmtMetric(decline.change)}`:"нет заметного снижения";document.getElementById("stableChip").textContent=`${stable.shortName} ${fmtMetric(stable.change)}`;document.getElementById("autoInsight").textContent=text;document.getElementById("updatedDate").textContent=fmtDate(state.data.updated);renderBars(metrics,"bars");renderCards(metrics);
+document.getElementById("shareDate").textContent=fmtDate(state.data.updated);document.getElementById("sharePeriod").textContent=`Россия · ${state.period===7?"последние 7 дней":"последние 4 недели"}`;document.getElementById("shareLeaderLabel").textContent=mode==="up"?"СИЛЬНЕЕ ПОДОРОЖАЛ":"СИЛЬНЕЕ ПОДЕШЕВЕЛ";document.getElementById("shareLeaderValue").textContent=fmtMetric(focus.change);document.getElementById("shareLeaderName").textContent=focus.shortName;document.getElementById("shareLeaderText").textContent=mode==="up"?`${highest.shortName}: максимальный рост среди шести выбранных категорий.`:`Заметного роста нет. ${decline.shortName} показал самое сильное снижение.`;document.getElementById("shareStable").textContent=`${stable.shortName} ${fmtMetric(stable.change)}`;document.getElementById("shareDecline").textContent=decline.change<-THRESHOLD?`${decline.shortName} ${fmtMetric(decline.change)}`:"нет заметного снижения";renderBars(metrics,"shareBars",true)}
+async function downloadPng(){const button=document.getElementById("downloadPng"),old=button.textContent;button.textContent="Готовим PNG…";button.disabled=true;try{const canvas=await html2canvas(document.getElementById("shareCard"),{scale:1,backgroundColor:"#f4f3ee",useCORS:true,logging:false});const link=document.createElement("a");link.download=`chto-stalo-dorozhe-${state.period}d-${state.data.updated}.png`;link.href=canvas.toDataURL("image/png");link.click()}finally{button.textContent=old;button.disabled=false}}
+async function init(){try{const response=await fetch("data/prices.json");if(!response.ok)throw new Error("Не удалось загрузить data/prices.json");state.data=await response.json();document.querySelectorAll(".period-btn").forEach(btn=>btn.addEventListener("click",()=>{document.querySelectorAll(".period-btn").forEach(b=>b.classList.remove("active"));btn.classList.add("active");state.period=Number(btn.dataset.period);render()}));document.getElementById("downloadPng").addEventListener("click",downloadPng);render()}catch(error){console.error(error);document.getElementById("headline").textContent="Не удалось загрузить данные";document.getElementById("summary").textContent="Не удалось загрузить файл данных."}}
 init();
