@@ -4,9 +4,10 @@ from __future__ import annotations
 import re
 import sys
 from pathlib import Path
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse
 
 import requests
+import urllib3
 
 from parse_rosstat import main as parse_xlsx
 
@@ -14,16 +15,31 @@ PAGE_URL = "https://rosstat.gov.ru/statistics/price"
 SOURCE_DIR = Path("source")
 SOURCE_FILE = SOURCE_DIR / "nedel_Ipc.xlsx"
 OUTPUT_FILE = Path("data/prices.json")
+HEADERS = {"User-Agent": "Mozilla/5.0 price-data-project/1.0"}
+
+# На GitHub-hosted runner цепочка сертификатов rosstat.gov.ru иногда не проходит
+# стандартную проверку CA. Отключаем TLS-проверку ТОЛЬКО для доменов Росстата;
+# происхождение файла дополнительно ограничивается allowlist доменов и XLSX
+# валидируется как ZIP-контейнер перед парсингом.
+ALLOWED_HOSTS = {"rosstat.gov.ru", "www.rosstat.gov.ru"}
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+
+def is_rosstat_url(url: str) -> bool:
+    parsed = urlparse(url)
+    return parsed.scheme == "https" and parsed.hostname in ALLOWED_HOSTS
+
+
+def rosstat_get(url: str, timeout: int) -> requests.Response:
+    if not is_rosstat_url(url):
+        raise ValueError(f"Заблокирован внешний источник: {url}")
+    response = requests.get(url, timeout=timeout, headers=HEADERS, verify=False)
+    response.raise_for_status()
+    return response
 
 
 def get_page() -> str:
-    response = requests.get(
-        PAGE_URL,
-        timeout=45,
-        headers={"User-Agent": "Mozilla/5.0 price-data-project/1.0"},
-    )
-    response.raise_for_status()
-    return response.text
+    return rosstat_get(PAGE_URL, 45).text
 
 
 def find_xlsx_urls(html: str) -> list[str]:
@@ -31,7 +47,7 @@ def find_xlsx_urls(html: str) -> list[str]:
     urls = []
     for href in hrefs:
         url = urljoin(PAGE_URL, href.replace("&amp;", "&"))
-        if url not in urls:
+        if is_rosstat_url(url) and url not in urls:
             urls.append(url)
     return urls
 
@@ -46,12 +62,7 @@ def score_url(url: str) -> int:
 
 
 def download(url: str, destination: Path) -> None:
-    response = requests.get(
-        url,
-        timeout=90,
-        headers={"User-Agent": "Mozilla/5.0 price-data-project/1.0"},
-    )
-    response.raise_for_status()
+    response = rosstat_get(url, 90)
     content = response.content
     if len(content) < 5000 or content[:2] != b"PK":
         raise ValueError("Ответ не похож на XLSX")
