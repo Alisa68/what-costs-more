@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Что дорожает быстрее? Визуальный анализ еженедельных индексов потребительских цен Росстата.">
+  <title>Что дорожает быстрее?</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="page">
+    <section class="hero">
+      <div class="eyebrow">DATA VISUALIZATION · РОССТАТ</div>
+      <h1>Что дорожает<br>быстрее?</h1>
+      <p class="lead">Сравниваем динамику шести повседневных категорий по официальным еженедельным индексам потребительских цен.</p>
+      <div class="period-switch" role="group" aria-label="Период анализа">
+        <button class="period-btn active" data-period="7">7 дней</button>
+        <button class="period-btn" data-period="30">30 дней</button>
+      </div>
+    </section>
+    <section class="analysis" id="analysis">
+      <div class="leader-panel">
+        <div class="radial-card">
+          <div class="radial-orbit orbit-1"></div><div class="radial-orbit orbit-2"></div>
+          <div class="radial-main" id="radialMain"><span class="radial-label">лидер роста</span><strong id="leaderValue">—</strong><span id="leaderName">—</span></div>
+          <div class="radial-dot dot-a"></div><div class="radial-dot dot-b"></div>
+        </div>
+        <div class="leader-copy"><span class="micro">ГЛАВНЫЙ СИГНАЛ</span><h2 id="headline">Загружаем данные…</h2><p id="summary">Проверяем последние значения Росстата.</p><div class="stat-chips"><div class="chip"><span>Сильнее всего снизилось</span><strong id="declineChip">—</strong></div><div class="chip"><span>Самая стабильная категория</span><strong id="stableChip">—</strong></div></div></div>
+      </div>
+      <div class="rank-section"><div class="section-head"><div><span class="micro">РЕЙТИНГ</span><h2>Изменение цен</h2></div><div class="legend"><span><i class="legend-up"></i> рост</span><span><i class="legend-down"></i> снижение</span></div></div><div class="bars" id="bars"></div></div>
+      <div class="cards" id="cards"></div>
+      <div class="bottom-grid"><article class="insight-card"><span class="micro">АВТОМАТИЧЕСКИЙ ВЫВОД</span><p id="autoInsight">—</p></article><article class="method-card"><span class="micro">МЕТОДИКА</span><p>7 дней — изменение к предыдущей дате регистрации. 30 дней — накопленное изменение за 4 недельных интервала (28 дней).</p><p class="source-note">Источник: <a href="https://rosstat.gov.ru/statistics/price" target="_blank" rel="noopener">Росстат</a> · обновлено <span id="updatedDate">—</span></p></article></div>
+      <div class="export-row"><button class="export-btn" id="downloadPng">Скачать анализ в PNG <span>↗</span></button><span class="export-note">1080 × 1350 · готово для соцсетей</span></div>
+    </section>
+  </main>
+  <section class="png-stage" aria-hidden="true"><div class="share-card" id="shareCard"><div class="share-top"><span>РОССТАТ · DATA SNAPSHOT</span><span id="shareDate">17.08.2026</span></div><div class="share-title"><h2>Что дорожает<br>быстрее?</h2><p id="sharePeriod">Россия · последние 30 дней</p></div><div class="share-leader"><div class="share-ring"><div class="share-ring-inner"><strong id="shareLeaderValue">—</strong><span id="shareLeaderName">—</span></div></div><div class="share-leader-copy"><span>ЛИДЕР РОСТА</span><p id="shareLeaderText">—</p></div></div><div class="share-bars" id="shareBars"></div><div class="share-footer"><div><span>САМАЯ СТАБИЛЬНАЯ</span><strong id="shareStable">—</strong></div><div><span>СИЛЬНЕЕ ВСЕГО СНИЗИЛОСЬ</span><strong id="shareDecline">—</strong></div></div><div class="share-source">Источник: Росстат · Индексы потребительских цен · 2026</div></div></section>
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script><script src="app.js"></script>
+</body>
+</html>
