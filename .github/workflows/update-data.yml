@@ -1,0 +1,56 @@
+name: Update Rosstat data
+
+on:
+  schedule:
+    # Четверг, 07:15 UTC. GitHub cron работает в UTC.
+    - cron: "15 7 * * 4"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: rosstat-data-update
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Download and validate Rosstat XLSX
+        run: python scripts/update_rosstat.py
+
+      - name: Check whether data changed
+        id: changes
+        shell: bash
+        run: |
+          if git diff --quiet -- data/prices.json; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "Свежих изменений данных нет."
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "Найдены новые данные."
+          fi
+
+      - name: Commit fresh data
+        if: steps.changes.outputs.changed == 'true'
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          DATE=$(python -c 'import json; print(json.load(open("data/prices.json", encoding="utf-8"))["updated"])')
+          git add data/prices.json
+          git commit -m "Update Rosstat data: $DATE"
+          git push
