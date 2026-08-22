@@ -2,8 +2,9 @@ name: Update Rosstat data
 
 on:
   schedule:
-    # Четверг, 07:15 UTC. GitHub cron работает в UTC.
-    - cron: "15 7 * * 4"
+    # Проверяем Росстат ежедневно в 10:15 UTC.
+    # Если новых данных нет, workflow ничего не коммитит.
+    - cron: "15 10 * * *"
   workflow_dispatch:
 
 permissions:
