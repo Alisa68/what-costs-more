@@ -66,3 +66,12 @@ radial-gradient(circle at 0% 74%,rgba(57,119,227,.18),transparent 28%),#f6f3ec}
 .story-card .share-bar-name{font-size:30px;font-weight:700;letter-spacing:-.025em;gap:16px}
 .story-card .share-bar-name .item-icon{width:42px;height:42px;flex-basis:42px;stroke-width:1.8}
 .story-card .share-bar{grid-template-columns:270px 1fr 150px}
+
+/* Story v4: editorial diverging chart */
+.story-card .share-bar-track{height:52px;background:none;border-radius:0;overflow:visible}
+.story-card .share-bar-track:before{content:"";position:absolute;left:0;right:0;top:25px;height:2px;background:#d8d6cf}
+.story-card .share-bar-track:after{left:50%;top:5px;bottom:5px;width:2px;background:#aaa9a3}
+.story-card .share-bar-pos,.story-card .share-bar-neg{height:18px;top:17px;border-radius:3px;box-shadow:0 4px 12px rgba(16,17,20,.08)}
+.story-card .share-bar-pos{background:var(--up)}
+.story-card .share-bar-neg{background:var(--down)}
+.story-card .share-bar-flat{height:24px;top:14px;width:4px!important;border-radius:2px;background:#8e8f8a}
