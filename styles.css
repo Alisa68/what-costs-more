@@ -61,3 +61,8 @@ radial-gradient(circle at 0% 74%,rgba(57,119,227,.18),transparent 28%),#f6f3ec}
 .story-card .share-footer span{font-size:14px;letter-spacing:.1em}
 .story-card .share-footer strong{font-size:27px;margin-top:10px}
 .story-card .share-source{font-size:15px;margin-top:32px}
+
+/* Story v3: stronger category labels */
+.story-card .share-bar-name{font-size:30px;font-weight:700;letter-spacing:-.025em;gap:16px}
+.story-card .share-bar-name .item-icon{width:42px;height:42px;flex-basis:42px;stroke-width:1.8}
+.story-card .share-bar{grid-template-columns:270px 1fr 150px}
