@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import re
 import sys
+import time
 from pathlib import Path
 from urllib.parse import urljoin, urlparse
 
@@ -30,16 +31,27 @@ def is_rosstat_url(url: str) -> bool:
     return parsed.scheme == "https" and parsed.hostname in ALLOWED_HOSTS
 
 
-def rosstat_get(url: str, timeout: int) -> requests.Response:
+def rosstat_get(url: str, timeout: int, attempts: int = 3) -> requests.Response:
     if not is_rosstat_url(url):
         raise ValueError(f"Заблокирован внешний источник: {url}")
-    response = requests.get(url, timeout=timeout, headers=HEADERS, verify=False)
-    response.raise_for_status()
-    return response
+    last_error = None
+    for attempt in range(1, attempts + 1):
+        try:
+            response = requests.get(url, timeout=timeout, headers=HEADERS, verify=False)
+            response.raise_for_status()
+            return response
+        except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as exc:
+            last_error = exc
+            if attempt == attempts:
+                break
+            wait = 10 * attempt
+            print(f"Росстат временно недоступен. Повтор {attempt + 1}/{attempts} через {wait} сек…", file=sys.stderr)
+            time.sleep(wait)
+    raise last_error
 
 
 def get_page() -> str:
-    return rosstat_get(PAGE_URL, 45).text
+    return rosstat_get(PAGE_URL, 30, attempts=3).text
 
 
 def find_xlsx_urls(html: str) -> list[str]:
@@ -62,7 +74,7 @@ def score_url(url: str) -> int:
 
 
 def download(url: str, destination: Path) -> None:
-    response = rosstat_get(url, 90)
+    response = rosstat_get(url, 60, attempts=3)
     content = response.content
     if len(content) < 5000 or content[:2] != b"PK":
         raise ValueError("Ответ не похож на XLSX")
