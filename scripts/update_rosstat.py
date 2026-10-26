@@ -13,6 +13,7 @@ import urllib3
 from parse_rosstat import main as parse_xlsx
 
 PAGE_URL = "https://rosstat.gov.ru/statistics/price"
+WEEKLY_URL = "https://rosstat.gov.ru/storage/mediabank/nedel_Ipc.xlsx"
 SOURCE_DIR = Path("source")
 SOURCE_FILE = SOURCE_DIR / "nedel_Ipc.xlsx"
 OUTPUT_FILE = Path("data/prices.json")
@@ -83,12 +84,8 @@ def download(url: str, destination: Path) -> None:
 
 
 def main() -> None:
-    html = get_page()
-    urls = find_xlsx_urls(html)
-    if not urls:
-        raise RuntimeError("На странице Росстата не найдены ссылки на XLSX")
-
-    candidates = sorted(urls, key=score_url, reverse=True)
+    # Используем только официальный недельный файл, не перебираем чужие XLSX.
+    candidates = [WEEKLY_URL]
     errors = []
 
     for url in candidates:
