@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import re
+import json
 import sys
 import time
 from pathlib import Path
@@ -92,7 +93,11 @@ def main() -> None:
         try:
             print(f"Проверяем: {url}")
             download(url, SOURCE_FILE)
+            previous = json.loads(OUTPUT_FILE.read_text(encoding='utf-8')) if OUTPUT_FILE.exists() else None
             parsed = parse_xlsx(SOURCE_FILE, OUTPUT_FILE)
+            if previous and parsed['updated'] < previous['updated']:
+                OUTPUT_FILE.write_text(json.dumps(previous, ensure_ascii=False, indent=2), encoding='utf-8')
+                raise ValueError(f"Источник устарел: {parsed['updated']} раньше сохранённой даты {previous['updated']}")
             print(f"Данные обновлены: {parsed['updated']}")
             print(f"Источник XLSX: {url}")
             return
