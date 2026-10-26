@@ -30,48 +30,44 @@ def parse_header_date(text, year):
     return f"{year}-{MONTHS[parts[1]]}-{int(parts[0]):02d}"
 
 
-def choose_year_sheet(workbook):
-    year_sheets = [name for name in workbook.sheetnames if str(name).isdigit() and len(str(name)) == 4]
-    if not year_sheets:
-        raise ValueError("В книге не найден лист с годом, например 2026")
-    sheet_name = max(year_sheets, key=int)
-    return workbook[sheet_name], int(sheet_name)
-
-
 def main(src, dst):
     workbook = load_workbook(src, data_only=True)
-    worksheet, year = choose_year_sheet(workbook)
-
-    dates = [parse_header_date(cell.value, year) for cell in worksheet[4][1:] if cell.value]
+    year_sheets = sorted((int(name) for name in workbook.sheetnames if str(name).isdigit() and len(str(name)) == 4))
+    if not year_sheets:
+        raise ValueError("В книге не найдены листы по годам")
+    latest_year = year_sheets[-1]
+    years = [year for year in year_sheets if year >= latest_year - 1]
+    dates = []
+    series = {item_id: [] for item_id in MAPPING}
+    for year in years:
+        worksheet = workbook[str(year)]
+        columns = [(cell.column - 1, parse_header_date(cell.value, year)) for cell in worksheet[4][1:] if cell.value]
+        by_name = {
+            str(row[0].value).strip(): [cell.value for cell in row[1:]]
+            for row in worksheet.iter_rows(min_row=5)
+            if row[0].value
+        }
+        for index, date in columns:
+            if dates and date <= dates[-1]:
+                raise ValueError(f"Неверный порядок дат: {date}")
+            dates.append(date)
+            for item_id, meta in MAPPING.items():
+                values = by_name.get(meta["sourceName"])
+                if values is None or index >= len(values) or not isinstance(values[index], (int, float)):
+                    raise ValueError(f"Нет индекса {meta['sourceName']} за {date}")
+                series[item_id].append(float(values[index]))
     if len(dates) < 2:
-        raise ValueError("В таблице найдено слишком мало недельных дат")
-
-    by_name = {
-        str(row[0].value).strip(): [cell.value for cell in row[1:1 + len(dates)]]
-        for row in worksheet.iter_rows(min_row=5)
-        if row[0].value
-    }
-
-    items = []
-    for item_id, meta in MAPPING.items():
-        source_name = meta["sourceName"]
-        if source_name not in by_name:
-            raise KeyError(f"Не найден показатель: {source_name}")
-        values = by_name[source_name]
-        if any(value is None for value in values):
-            raise ValueError(f"В ряду {source_name!r} есть пустые значения")
-        items.append({"id": item_id, **meta, "indices": [float(value) for value in values]})
-
+        raise ValueError("Недостаточно недельных данных")
+    items = [{"id": item_id, **meta, "indices": series[item_id]} for item_id, meta in MAPPING.items()]
     output = {
         "source": "Росстат",
         "sourceUrl": "https://rosstat.gov.ru/statistics/price",
         "scope": "Российская Федерация",
         "updated": dates[-1],
-        "methodology": "Индексы потребительских цен в % к предыдущей дате регистрации. 7 дней = последняя недельная точка. 30 дней = накопленное изменение за последние 4 недельных интервала (28 дней).",
+        "methodology": "Недельные индексы к предыдущей дате регистрации. 7 дней = последняя точка. 12 месяцев = накопленное изменение индексов после соответствующей даты год назад.",
         "dates": dates,
         "items": items,
     }
-
     destination = Path(dst)
     destination.parent.mkdir(parents=True, exist_ok=True)
     destination.write_text(json.dumps(output, ensure_ascii=False, indent=2), encoding="utf-8")
