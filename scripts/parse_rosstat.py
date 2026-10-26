@@ -41,7 +41,7 @@ def main(src, dst):
     series = {item_id: [] for item_id in MAPPING}
     for year in years:
         worksheet = workbook[str(year)]
-        columns = [(cell.column - 1, parse_header_date(cell.value, year)) for cell in worksheet[4][1:] if cell.value]
+        columns = [(cell.column - 2, parse_header_date(cell.value, year)) for cell in worksheet[4][1:] if cell.value]
         by_name = {
             str(row[0].value).strip(): [cell.value for cell in row[1:]]
             for row in worksheet.iter_rows(min_row=5)
