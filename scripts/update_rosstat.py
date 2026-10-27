@@ -97,7 +97,11 @@ def main() -> None:
             parsed = parse_xlsx(SOURCE_FILE, OUTPUT_FILE)
             if previous and parsed['updated'] < previous['updated']:
                 OUTPUT_FILE.write_text(json.dumps(previous, ensure_ascii=False, indent=2), encoding='utf-8')
-                raise ValueError(f"Источник устарел: {parsed['updated']} раньше сохранённой даты {previous['updated']}")
+                print(f"Новых данных нет: источник содержит {parsed['updated']}, сохранены данные за {previous['updated']}. Оставляем текущие данные.")
+                return
+            if previous and previous.get("publicationDate") and not parsed.get("publicationDate") and parsed["updated"] == previous["updated"]:
+                parsed["publicationDate"] = previous["publicationDate"]
+                OUTPUT_FILE.write_text(json.dumps(parsed, ensure_ascii=False, indent=2), encoding="utf-8")
             print(f"Данные обновлены: {parsed['updated']}")
             print(f"Источник XLSX: {url}")
             return
