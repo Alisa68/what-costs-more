@@ -88,20 +88,30 @@ def main() -> None:
     # Используем только официальный недельный файл, не перебираем чужие XLSX.
     candidates = [WEEKLY_URL]
     errors = []
+    try:
+        html = get_page()
+        links = find_xlsx_urls(html)
+        weekly = [url for url in links if any(token in url.lower() for token in ("nedel", "week", "недель"))]
+        candidates = weekly + [url for url in candidates if url not in weekly]
+        print(f"На странице Росстата найдено {len(weekly)} ссылок на недельные XLSX.")
+    except Exception as exc:
+        print(f"Страница Росстата недоступна: {exc}. Проверяем резервную ссылку.", file=sys.stderr)
 
     for url in candidates:
         try:
             print(f"Проверяем: {url}")
             download(url, SOURCE_FILE)
             previous = json.loads(OUTPUT_FILE.read_text(encoding='utf-8')) if OUTPUT_FILE.exists() else None
-            parsed = parse_xlsx(SOURCE_FILE, OUTPUT_FILE)
+            temporary_output = OUTPUT_FILE.with_suffix(".candidate.json")
+            parsed = parse_xlsx(SOURCE_FILE, temporary_output)
             if previous and parsed['updated'] < previous['updated']:
-                OUTPUT_FILE.write_text(json.dumps(previous, ensure_ascii=False, indent=2), encoding='utf-8')
+                temporary_output.unlink(missing_ok=True)
                 print(f"Новых данных нет: источник содержит {parsed['updated']}, сохранены данные за {previous['updated']}. Оставляем текущие данные.")
                 return
             if previous and previous.get("publicationDate") and not parsed.get("publicationDate") and parsed["updated"] == previous["updated"]:
                 parsed["publicationDate"] = previous["publicationDate"]
-                OUTPUT_FILE.write_text(json.dumps(parsed, ensure_ascii=False, indent=2), encoding="utf-8")
+                temporary_output.write_text(json.dumps(parsed, ensure_ascii=False, indent=2), encoding="utf-8")
+            temporary_output.replace(OUTPUT_FILE)
             print(f"Данные обновлены: {parsed['updated']}")
             print(f"Источник XLSX: {url}")
             return
@@ -110,6 +120,7 @@ def main() -> None:
             print(f"Не подошёл: {exc}", file=sys.stderr)
 
     SOURCE_FILE.unlink(missing_ok=True)
+    OUTPUT_FILE.with_suffix(".candidate.json").unlink(missing_ok=True)
     details = "\n".join(errors[:12])
     raise RuntimeError("Не удалось найти совместимый еженедельный XLSX Росстата.\n" + details)
 
