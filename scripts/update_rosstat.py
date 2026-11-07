@@ -87,12 +87,22 @@ def download(url: str, destination: Path) -> None:
 def main() -> None:
     # Используем только официальный недельный файл, не перебираем чужие XLSX.
     candidates = [WEEKLY_URL]
+    # Росстат иногда отдаёт 404 с основного хоста, даже если ссылка
+    # на таблицу опубликована. Пробуем также www-хост.
     errors = []
     try:
         html = get_page()
         links = find_xlsx_urls(html)
         weekly = [url for url in links if any(token in url.lower() for token in ("nedel", "week", "недель"))]
         candidates = weekly + [url for url in candidates if url not in weekly]
+        mirrors = []
+        for url in candidates:
+            parsed_url = urlparse(url)
+            mirror_host = "www.rosstat.gov.ru" if parsed_url.hostname == "rosstat.gov.ru" else "rosstat.gov.ru"
+            mirror = parsed_url._replace(netloc=mirror_host).geturl()
+            if mirror not in candidates and mirror not in mirrors:
+                mirrors.append(mirror)
+        candidates += mirrors
         print(f"На странице Росстата найдено {len(weekly)} ссылок на недельные XLSX.")
     except Exception as exc:
         print(f"Страница Росстата недоступна: {exc}. Проверяем резервную ссылку.", file=sys.stderr)
